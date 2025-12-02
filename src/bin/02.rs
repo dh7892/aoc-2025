@@ -25,28 +25,13 @@ fn has_repeat(num: usize) -> bool {
 fn has_repeats(num: usize) -> bool {
     let num_str = num.to_string();
     let len = num_str.len();
-    if len < 2 {
-        return false;
-    }
-    // We build a list of options for the repeating substring
-    // by taking longer slices of the number from the start up to half the length
-    let options = (1..=len / 2)
-        .map(|l| num_str[0..l].parse::<usize>().unwrap())
-        .collect::<Vec<usize>>();
-    for trial in options {
-        let trial_str = trial.to_string();
-        let trial_len = trial_str.len();
-        if len % trial_len != 0 {
+    let num_bytes = num_str.as_bytes();
+    for l in 1..=len / 2 {
+        if len % l != 0 {
             continue;
         }
-        let mut repeated = true;
-        for i in (0..len).step_by(trial_len) {
-            if &num_str[i..i + trial_len] != trial_str {
-                repeated = false;
-                break;
-            }
-        }
-        if repeated {
+        let pattern = &num_bytes[0..l];
+        if num_bytes.chunks_exact(l).all(|chunk| chunk == pattern) {
             return true;
         }
     }
