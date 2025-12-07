@@ -81,7 +81,7 @@ pub fn part_two(input: &str) -> Option<u64> {
     let num_rows = char_array.len();
     let num_cols = char_array[0].len();
 
-    // "rotate" our chars to we have a vec of columns
+    // "rotate" our chars so we have a vec of columns
     let mut col_array: Vec<Vec<char>> = vec![Vec::new(); num_cols];
     for row in 0..num_rows {
         for col in 0..num_cols {

@@ -115,10 +115,11 @@ impl Iterator for AllDays {
     type Item = Day;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current > 25 {
+        if self.current > 12 {
             return None;
         }
-        // NOTE: the iterator starts at 1 and we have verified that the value is not above 25.
+        // NOTE: the iterator starts at 1 and we have verified that the value is not above 12.
+        // This year for the first time only 12 days are available.
         let day = Day(self.current);
         self.current += 1;
 
