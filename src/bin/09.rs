@@ -175,8 +175,6 @@ pub fn part_two(input: &str) -> Option<u64> {
 
     // Find the biggest area formed between any two corners
     let mut biggest_area: u64 = 0;
-    let mut c1 = Corner::new(0, 0);
-    let mut c2 = Corner::new(0, 0);
     for i in 0..corners.len() {
         for j in i + 1..corners.len() {
             if rectangle_goes_outside_bounds(&corners[i], &corners[j], &corners) {
@@ -186,8 +184,6 @@ pub fn part_two(input: &str) -> Option<u64> {
             let area = corners[i].area_with_other(&corners[j]);
             if area > biggest_area {
                 biggest_area = area;
-                c1 = corners[i];
-                c2 = corners[j];
             }
         }
     }
