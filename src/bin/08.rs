@@ -46,6 +46,35 @@ fn get_potential_connections(junction_boxes: &Vec<JunctionBox>) -> Vec<(usize, u
     potential_connections
 }
 
+fn make_connection(a: &JunctionBox, b: &JunctionBox, circuits: &mut Vec<HashSet<JunctionBox>>) {
+    let a_circuit_idx = circuits.iter().position(|circuit| circuit.contains(a));
+    let b_circuit_idx = circuits.iter().position(|circuit| circuit.contains(b));
+
+    match (a_circuit_idx, b_circuit_idx) {
+        (Some(ac_idx), Some(bc_idx)) => {
+            if ac_idx != bc_idx {
+                // Need to merge circuits at different indices
+                // Clone the one we're merging from
+                let to_merge = circuits[bc_idx].clone();
+                circuits[ac_idx].extend(to_merge);
+                circuits.remove(bc_idx);
+            }
+        }
+        (Some(ac_idx), None) => {
+            circuits[ac_idx].insert(b.clone());
+        }
+        (None, Some(bc_idx)) => {
+            circuits[bc_idx].insert(a.clone());
+        }
+        (None, None) => {
+            let mut new_circuit = HashSet::new();
+            new_circuit.insert(a.clone());
+            new_circuit.insert(b.clone());
+            circuits.push(new_circuit);
+        }
+    }
+}
+
 fn connect_closest_n(input: &str, number_to_connect: usize) -> u64 {
     let junction_boxes = parse_input(input);
     let potential_connections = get_potential_connections(&junction_boxes);
@@ -56,38 +85,7 @@ fn connect_closest_n(input: &str, number_to_connect: usize) -> u64 {
             break;
         }
         let (a, b, _distance) = &potential_connections[i];
-
-        // Find indices instead of mutable references
-        let a_circuit_idx = circuits
-            .iter()
-            .position(|circuit| circuit.contains(&junction_boxes[*a]));
-        let b_circuit_idx = circuits
-            .iter()
-            .position(|circuit| circuit.contains(&junction_boxes[*b]));
-
-        match (a_circuit_idx, b_circuit_idx) {
-            (Some(ac_idx), Some(bc_idx)) => {
-                if ac_idx != bc_idx {
-                    // Need to merge circuits at different indices
-                    // Clone the one we're merging from
-                    let to_merge = circuits[bc_idx].clone();
-                    circuits[ac_idx].extend(to_merge);
-                    circuits.remove(bc_idx);
-                }
-            }
-            (Some(ac_idx), None) => {
-                circuits[ac_idx].insert(junction_boxes[*b].clone());
-            }
-            (None, Some(bc_idx)) => {
-                circuits[bc_idx].insert(junction_boxes[*a].clone());
-            }
-            (None, None) => {
-                let mut new_circuit = HashSet::new();
-                new_circuit.insert(junction_boxes[*a].clone());
-                new_circuit.insert(junction_boxes[*b].clone());
-                circuits.push(new_circuit);
-            }
-        }
+        make_connection(&junction_boxes[*a], &junction_boxes[*b], &mut circuits);
     }
 
     // Now multiply together the sizes of the biggest 3 circuits
@@ -105,37 +103,7 @@ fn connect_until_one_circuit(input: &str) -> u64 {
 
     let mut circuits: Vec<HashSet<JunctionBox>> = vec![];
     for (a, b, _distance) in potential_connections.iter() {
-        // Find indices instead of mutable references
-        let a_circuit_idx = circuits
-            .iter()
-            .position(|circuit| circuit.contains(&junction_boxes[*a]));
-        let b_circuit_idx = circuits
-            .iter()
-            .position(|circuit| circuit.contains(&junction_boxes[*b]));
-
-        match (a_circuit_idx, b_circuit_idx) {
-            (Some(ac_idx), Some(bc_idx)) => {
-                if ac_idx != bc_idx {
-                    // Need to merge circuits at different indices
-                    // Clone the one we're merging from
-                    let to_merge = circuits[bc_idx].clone();
-                    circuits[ac_idx].extend(to_merge);
-                    circuits.remove(bc_idx);
-                }
-            }
-            (Some(ac_idx), None) => {
-                circuits[ac_idx].insert(junction_boxes[*b].clone());
-            }
-            (None, Some(bc_idx)) => {
-                circuits[bc_idx].insert(junction_boxes[*a].clone());
-            }
-            (None, None) => {
-                let mut new_circuit = HashSet::new();
-                new_circuit.insert(junction_boxes[*a].clone());
-                new_circuit.insert(junction_boxes[*b].clone());
-                circuits.push(new_circuit);
-            }
-        }
+        make_connection(&junction_boxes[*a], &junction_boxes[*b], &mut circuits);
 
         // If all of the junction boxes are now connected, break
         if circuits.len() == 1 && circuits[0].len() == junction_boxes.len() {

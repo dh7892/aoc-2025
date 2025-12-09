@@ -17,7 +17,7 @@
                     // the editor.
                     "--bin=${fileBasenameNoExtension}",
                     "--package=advent_of_code"
-                ],
+                ]
             },
             "args": [],
             "cwd": "${workspaceFolder}"
@@ -34,7 +34,7 @@
                     // the editor
                     "--bin=${fileBasenameNoExtension}",
                     "--package=advent_of_code"
-                ],
+                ]
             },
             "cwd": "${workspaceFolder}"
         },
