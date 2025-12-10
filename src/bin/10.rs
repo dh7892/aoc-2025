@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use petgraph::graph;
 use good_lp::*;
+use petgraph::graph;
 
 advent_of_code::solution!(10);
 
@@ -54,8 +54,10 @@ impl Lights {
             }
         }
     }
-    // pretty print lights in this format: "[..#..#..]"
-    // Where # is on and . is off
+
+    // Pretty print lights in this format: "[..#..#..]"
+    // Where # is on and . is off (used in tests)
+    #[cfg(test)]
     fn pretty_print(&self) -> String {
         let mut result = String::from("[");
         for &light in &self.state {
@@ -67,11 +69,6 @@ impl Lights {
         }
         result.push(']');
         result
-    }
-
-    // For debug, we will use pretty_print to show the state of the lights
-    fn debug(&self) {
-        println!("{}", self.pretty_print());
     }
 }
 
@@ -95,22 +92,6 @@ impl Schematic {
             .collect();
 
         Some(Self { toggles })
-    }
-
-    fn pretty_print(&self) -> String {
-        let mut result = String::from("(");
-        for (i, &toggle) in self.toggles.iter().enumerate() {
-            result.push_str(&toggle.to_string());
-            if i < self.toggles.len() - 1 {
-                result.push(',');
-            }
-        }
-        result.push(')');
-        result
-    }
-
-    fn debug(&self) {
-        println!("{}", self.pretty_print());
     }
 }
 
@@ -136,170 +117,6 @@ impl Joltages {
 
         Some(Self { values })
     }
-    fn pretty_print(&self) -> String {
-        let mut result = String::from("{");
-        for (i, &value) in self.values.iter().enumerate() {
-            result.push_str(&value.to_string());
-            if i < self.values.len() - 1 {
-                result.push(',');
-            }
-        }
-        result.push('}');
-        result
-    }
-    fn debug(&self) {
-        println!("{}", self.pretty_print());
-    }
-
-    fn apply_schematic(&mut self, schematic: &Schematic) {
-        for &index in &schematic.toggles {
-            if let Some(value) = self.values.get_mut(index) {
-                *value += 1;
-            }
-        }
-    }
-
-    // If any individual joltage is greater than the bound, return false
-    fn in_bounds(&self, bound: &Joltages) -> bool {
-        for (i, &value) in self.values.iter().enumerate() {
-            if let Some(&bound_value) = bound.values.get(i) {
-                if value > bound_value {
-                    return false;
-                }
-            }
-        }
-        true
-    }
-}
-
-// Improved heuristic that considers the best possible schematic coverage
-// We compute: sum of all deficits / size of largest schematic
-// This is admissible (optimistic) because it assumes we can always use the largest schematic
-fn heuristic(current: &Joltages, target: &Joltages, max_schematic_size: usize) -> u64 {
-    let total_deficit: u64 = current
-        .values
-        .iter()
-        .zip(target.values.iter())
-        .map(|(&c, &t)| if t > c { t - c } else { 0 })
-        .sum();
-
-    // Divide by max schematic size (rounding up)
-    if max_schematic_size == 0 {
-        return total_deficit;
-    }
-    (total_deficit + max_schematic_size as u64 - 1) / max_schematic_size as u64
-}
-
-// Score a schematic based on how helpful it is for the current state
-fn score_schematic(
-    schematic: &Schematic,
-    current: &[u64],
-    target: &[u64],
-) -> Option<u64> {
-    let mut score = 0u64;
-
-    for &toggle_idx in &schematic.toggles {
-        if toggle_idx < current.len() {
-            let curr_val = current[toggle_idx];
-            let target_val = target[toggle_idx];
-
-            if curr_val < target_val {
-                // Weight by deficit - helps joltages that need it most
-                score += (target_val - curr_val);
-            } else if curr_val >= target_val {
-                // Would exceed target - invalid move
-                return None;
-            }
-        }
-    }
-
-    Some(score)
-}
-
-// Backtracking search with greedy heuristic ordering
-fn backtracking_search(
-    current: &mut Vec<u64>,
-    target: &[u64],
-    schematics: &[Schematic],
-    depth: u64,
-    best_so_far: &mut u64,
-    memo: &mut HashMap<Vec<u64>, Option<u64>>,
-) -> Option<u64> {
-    // Check if we've reached the target
-    if current == target {
-        return Some(depth);
-    }
-
-    // Prune if we've already exceeded the best solution found
-    if depth >= *best_so_far {
-        return None;
-    }
-
-    // Check memo
-    if let Some(&cached) = memo.get(current) {
-        return cached.map(|c| c + depth);
-    }
-
-    // Safety limit to prevent stack overflow
-    if depth > 200 {
-        return None;
-    }
-
-    // Get all valid schematics with their scores
-    let mut options: Vec<(usize, u64)> = schematics
-        .iter()
-        .enumerate()
-        .filter_map(|(idx, schematic)| {
-            score_schematic(schematic, current, target).map(|score| (idx, score))
-        })
-        .collect();
-
-    // Sort by score (highest first) - this is the greedy heuristic
-    options.sort_by_key(|&(_, score)| std::cmp::Reverse(score));
-
-    // If no valid moves, we're stuck
-    if options.is_empty() {
-        memo.insert(current.clone(), None);
-        return None;
-    }
-
-    // Try each option in order (best first, with backtracking)
-    for (idx, _score) in options {
-        // Apply the schematic
-        for &toggle_idx in &schematics[idx].toggles {
-            if toggle_idx < current.len() {
-                current[toggle_idx] += 1;
-            }
-        }
-
-        // Recursively search
-        if let Some(result) = backtracking_search(current, target, schematics, depth + 1, best_so_far, memo) {
-            // Found a solution! Update best
-            if result < *best_so_far {
-                *best_so_far = result;
-            }
-
-            // Undo the move before returning
-            for &toggle_idx in &schematics[idx].toggles {
-                if toggle_idx < current.len() {
-                    current[toggle_idx] -= 1;
-                }
-            }
-
-            return Some(result);
-        }
-
-        // Backtrack - undo the move
-        for &toggle_idx in &schematics[idx].toggles {
-            if toggle_idx < current.len() {
-                current[toggle_idx] -= 1;
-            }
-        }
-    }
-
-    // No solution found from this state
-    memo.insert(current.clone(), None);
-    None
 }
 
 // ILP solution: Solve the integer linear program
@@ -362,43 +179,6 @@ fn ilp_solution(
             u64::MAX
         }
     }
-}
-
-// Main solver - try ILP first, fall back to backtracking for small inputs
-fn greedy_solution(
-    target_joltages: &Joltages,
-    schematics: &[Schematic],
-) -> u64 {
-    // Try ILP solution
-    ilp_solution(target_joltages, schematics)
-}
-
-// Validate a solution by simulating the presses
-fn validate_solution(presses: &[(usize, u64)], target: &[u64], schematics: &[Schematic]) -> bool {
-    let mut current = vec![0u64; target.len()];
-    for &(schematic_idx, count) in presses {
-        for _ in 0..count {
-            for &toggle_idx in &schematics[schematic_idx].toggles {
-                if toggle_idx < current.len() {
-                    current[toggle_idx] += 1;
-                }
-            }
-        }
-    }
-    current == target
-}
-
-// Main function: try greedy approach
-fn lowest_button_count_for_valid_joltages(
-    _current_joltages: Joltages,
-    target_joltages: &Joltages,
-    schematics: &[Schematic],
-    _current_count: u64,
-    lowest_count: &mut u64,
-) -> u64 {
-    let result = greedy_solution(target_joltages, schematics);
-    *lowest_count = result;
-    result
 }
 
 // Recurrsively generate all possible light states for a given number of lights
@@ -478,25 +258,14 @@ pub fn part_two(input: &str) -> Option<u64> {
         .filter(|line| !line.is_empty())
         .map(|line| {
             let joltages = Joltages::from_str(line).unwrap();
-            let mut schematics = line
+            let schematics = line
                 .split(" ")
                 .skip(1)
                 .filter_map(|s| Schematic::from_str(s))
                 .collect::<Vec<Schematic>>();
 
-            // Sort schematics by size (largest first) - helps A* explore better paths first
-            schematics.sort_by_key(|s| std::cmp::Reverse(s.toggles.len()));
+            let joltage_button_count = ilp_solution(&joltages, &schematics);
 
-            let mut lowest_possible = u64::MAX; // Start with no limit
-            let joltage_button_count = lowest_button_count_for_valid_joltages(
-                Joltages {
-                    values: vec![0; joltages.values.len()],
-                },
-                &joltages,
-                &schematics,
-                0,
-                &mut lowest_possible,
-            );
             if joltage_button_count == u64::MAX {
                 // No solution found - skip this line
                 0
@@ -525,8 +294,7 @@ mod tests {
     }
 
     #[test]
-    fn test_lowest_button_count() {
-        let current_joltages = Joltages { values: vec![0, 0] };
+    fn test_ilp_solution() {
         let target_joltages = Joltages { values: vec![1, 2] };
         let schematics = vec![
             Schematic { toggles: vec![1] },
@@ -534,14 +302,7 @@ mod tests {
                 toggles: vec![0, 1],
             },
         ];
-        let mut lowest = u64::MAX;
-        let count = lowest_button_count_for_valid_joltages(
-            current_joltages,
-            &target_joltages,
-            &schematics,
-            0,
-            &mut lowest,
-        );
+        let count = ilp_solution(&target_joltages, &schematics);
         // To get [1, 2]:
         // Press schematic[1] (0,1) once: [1, 1]
         // Press schematic[0] (1) once: [1, 2]
@@ -553,30 +314,18 @@ mod tests {
     fn test_real_input_line1() {
         let line = "[.#......#.] (2,9) (3,5,6,7,8) (0,7,8,9) (4) (0,2,3) (2,3,4,5,6,7,8,9) (1,2,3,7) (1,8) (0,2,5,6,9) (0,1,2,3,5,6,7) {59,48,81,71,11,42,42,70,42,42}";
         let joltages = Joltages::from_str(line).unwrap();
-        let mut schematics = line
+        let schematics = line
             .split(" ")
             .skip(1)
             .filter_map(|s| Schematic::from_str(s))
             .collect::<Vec<Schematic>>();
 
-        // Sort schematics by size (largest first)
-        schematics.sort_by_key(|s| std::cmp::Reverse(s.toggles.len()));
-
-        let mut lowest = u64::MAX;
         let start = std::time::Instant::now();
-        let count = lowest_button_count_for_valid_joltages(
-            Joltages {
-                values: vec![0; joltages.values.len()],
-            },
-            &joltages,
-            &schematics,
-            0,
-            &mut lowest,
-        );
+        let count = ilp_solution(&joltages, &schematics);
         let elapsed = start.elapsed();
 
         println!("Found solution: {} in {:?}", count, elapsed);
-        // We don't know the expected answer yet, just verify it completes in reasonable time
+        // Verify it completes in reasonable time
         assert!(elapsed.as_secs() < 5, "Should complete in under 5 seconds");
         assert_ne!(count, u64::MAX, "Should find a solution");
     }
