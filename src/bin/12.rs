@@ -1,5 +1,7 @@
 advent_of_code::solution!(12);
 
+use good_lp::*;
+
 #[derive(Debug, Clone)]
 struct Shape {
     cells: Vec<(i32, i32)>, // occupied cells relative to origin
@@ -315,6 +317,88 @@ fn solve_backtracking_recursive(
     false
 }
 
+fn solve_with_constraint_solver(
+    grid_w: usize,
+    grid_h: usize,
+    shapes: &[Shape],
+    counts: &[usize],
+) -> bool {
+    // Precompute all orientations
+    let all_orientations: Vec<Vec<Shape>> =
+        shapes.iter().map(|s| s.get_all_orientations()).collect();
+
+    let mut problem = ProblemVariables::new();
+    let mut placements = Vec::new();
+
+    // Create variables for each possible placement
+    for (shape_idx, &count) in counts.iter().enumerate() {
+        for _ in 0..count {
+            let mut instance_vars = Vec::new();
+
+            for y in 0..grid_h {
+                for x in 0..grid_w {
+                    for (_orient_idx, orientation) in all_orientations[shape_idx].iter().enumerate() {
+                        // Check if this placement is within bounds
+                        let mut valid = true;
+                        for (dy, dx) in &orientation.cells {
+                            let grid_x = x as i32 + dx;
+                            let grid_y = y as i32 + dy;
+                            if grid_x < 0 || grid_y < 0 || grid_x >= grid_w as i32 || grid_y >= grid_h as i32 {
+                                valid = false;
+                                break;
+                            }
+                        }
+
+                        if valid {
+                            let var = problem.add(variable().binary());
+                            instance_vars.push((var, x, y, orientation.clone()));
+                        }
+                    }
+                }
+            }
+
+            placements.push(instance_vars);
+        }
+    }
+
+    // Build the model
+    let mut model = problem.minimise(0).using(default_solver);
+
+    // Constraint: each shape instance must be placed exactly once
+    for instance_vars in &placements {
+        let sum: Expression = instance_vars.iter().map(|(var, _, _, _)| *var).sum();
+        model = model.with(constraint!(sum == 1));
+    }
+
+    // Constraint: each grid cell occupied by at most one shape
+    for grid_y in 0..grid_h {
+        for grid_x in 0..grid_w {
+            let mut occupying_vars = Vec::new();
+
+            for instance_vars in &placements {
+                for (var, x, y, orientation) in instance_vars {
+                    // Check if this placement covers cell (grid_x, grid_y)
+                    for (dy, dx) in &orientation.cells {
+                        if (*y as i32 + dy) == grid_y as i32 && (*x as i32 + dx) == grid_x as i32 {
+                            occupying_vars.push(*var);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if !occupying_vars.is_empty() {
+                let sum: Expression = occupying_vars.into_iter().sum();
+                model = model.with(constraint!(sum <= 1));
+            }
+        }
+    }
+
+    // Solve
+    matches!(model.solve(), Ok(_))
+}
+
+#[allow(dead_code)]
 fn solve_with_backtracking(
     grid_w: usize,
     grid_h: usize,
@@ -382,8 +466,7 @@ pub fn part_one(input: &str) -> Option<u64> {
 
     let count = problems
         .iter()
-        .inspect(|problem| println!("Solving problem: {:?}", problem))
-        .filter(|problem| solve_with_backtracking(problem.j, problem.i, &shapes, &problem.shape_counts))
+        .filter(|problem| solve_with_constraint_solver(problem.j, problem.i, &shapes, &problem.shape_counts))
         .count();
 
     count.try_into().ok()
