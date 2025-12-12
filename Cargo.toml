@@ -34,3 +34,4 @@ tinyjson = "2.5.1"
 
 # Solution dependencies
 good_lp = { version = "1.8", features = ["minilp"], default-features = false }
+varisat = "0.2.2"
