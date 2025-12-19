@@ -25,6 +25,7 @@ array2d = "0.3.2"
 # Template dependencies
 chrono = { version = "0.4.38", optional = true }
 dhat = { version = "0.3.3", optional = true }
+good_lp = { version = "1.14.2", default-features = false, features = ["microlp"] }
 indicatif = "0.18.3"
 miette = "7.6.0"
 petgraph = "0.8.3"
